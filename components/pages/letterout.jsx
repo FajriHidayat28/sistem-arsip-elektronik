@@ -1,0 +1,71 @@
+"use client";
+import axios from "axios";
+import { getLetterByUserid, getUsers } from "@/utils/custom-swr";
+import DataLists from "../ui/datatable";
+import { mutate } from "swr";
+import { useSession } from "next-auth/react";
+import Scripts from "@/utils/scripts";
+
+export default function LetterOut() {
+  const { data: session } = useSession();
+  const { toastAlert, formatBytes } = Scripts();
+  const { letterout } = getLetterByUserid(session?.user?.userid);
+
+  // Transformasi data untuk menambahkan ukuran berkas yang diformat
+  const formattedLetterOut =
+    letterout?.map((item) => ({
+      ...item,
+      filesizeFormatted: formatBytes(item.filesize),
+    })) || [];
+
+  const handleDelete = async (fileid, file) => {
+    await axios.delete("/api/files/delete/by-fileid?fileid=" + fileid + "&file=" + file).then((res) => {
+      toastAlert("success", "Berhasil hapus!", "Penghapus data pengguna berhasil!", 3000);
+      mutate("/api/files/get/all");
+    });
+  };
+
+  return (
+    <>
+      <div className="card mt-3">
+        <DataLists
+          tableName="Data Berkas Surat Keluar"
+          subHeaderMemo={true}
+          data={formattedLetterOut}
+          filterFields={["filenumber", "sendername", "sendingdate", "filename", "filesizeFormatted"]}
+          tableOptions={{
+            paginator: true,
+            rows: 10,
+            rowsPerPageOptions: [10, 20, 50, 100],
+          }}
+          columns={[
+            { field: "filenumber", header: "Nomor Surat" },
+            { field: "sendername", header: "Nama Pengirim" },
+            { field: "sendingdate", header: "Tanggal Masuk / Keluar" },
+            { field: "filename", header: "Perihal" },
+            { field: "filesizeFormatted", header: "Ukuran Berkas" },
+            {
+              field: "filetype",
+              header: "Tipe",
+              body: (rowData) => <>{rowData.filetype === "LETTERIN" ? "" : <i className="fa-regular fa-circle-up text-red-500"></i>}</>,
+            },
+            {
+              field: "actions",
+              header: "Aksi",
+              body: (rowData) => (
+                <div className="flex gap-3">
+                  <a href={"/files/" + rowData.file} target="_blank" className={"p-2 bg-blue-500 rounded-lg text-white text-sm"}>
+                    Lihat
+                  </a>
+                  <button type="button" onClick={() => handleDelete(rowData.fileid, rowData.file)} className={"p-2 bg-red-500 rounded-lg text-white text-sm"}>
+                    Hapus
+                  </button>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </div>
+    </>
+  );
+}
